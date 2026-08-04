@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CI/CD Demo App</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header>
+    <nav>
+      <div class="logo">🚀 DeployDemo</div>
+      <ul>
+        <li><a href="#home">Home</a></li>
+        <li><a href="#about">About</a></li>
+        <li><a href="#pipeline">Pipeline</a></li>
+      </ul>
+    </nav>
+  </header>
+
+  <main>
+    <!-- Hero Section -->
+    <section id="home" class="hero">
+      <div class="hero-content">
+        <span class="badge">Live on EC2 via GitHub Actions</span>
+        <h1>CI/CD Pipeline <span class="highlight">Demo</span></h1>
+        <p class="subtitle">
+          This page was automatically deployed from GitHub to an Amazon EC2
+          Ubuntu instance using GitHub Actions — no manual steps required.
+        </p>
+        <div class="hero-actions">
+          <a href="#pipeline" class="btn btn-primary">See the Pipeline</a>
+          <a href="https://github.com" target="_blank" class="btn btn-secondary">View on GitHub</a>
+        </div>
+      </div>
+      <div class="hero-graphic">
+        <div class="flow">
+          <div class="flow-step">
+            <div class="icon">💻</div>
+            <span>Push Code</span>
+          </div>
+          <div class="arrow">→</div>
+          <div class="flow-step">
+            <div class="icon">⚙️</div>
+            <span>GitHub Actions</span>
+          </div>
+          <div class="arrow">→</div>
+          <div class="flow-step">
+            <div class="icon">☁️</div>
+            <span>EC2 Deploy</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- About Section -->
+    <section id="about" class="about">
+      <h2>What is CI/CD?</h2>
+      <div class="cards">
+        <div class="card">
+          <div class="card-icon">🔄</div>
+          <h3>Continuous Integration</h3>
+          <p>Every code push triggers an automated build and test process, catching bugs early before they reach production.</p>
+        </div>
+        <div class="card">
+          <div class="card-icon">🚢</div>
+          <h3>Continuous Deployment</h3>
+          <p>Verified code is automatically deployed to your server — in this case, an Amazon EC2 Ubuntu instance.</p>
+        </div>
+        <div class="card">
+          <div class="card-icon">🛡️</div>
+          <h3>Reliability</h3>
+          <p>Automated pipelines reduce human error and ensure every deployment follows the exact same process.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Pipeline Section -->
+    <section id="pipeline" class="pipeline">
+      <h2>The Pipeline Steps</h2>
+      <p class="section-subtitle">From git push to live server in seconds</p>
+      <ol class="steps">
+        <li class="step">
+          <div class="step-number">1</div>
+          <div class="step-content">
+            <h4>Developer pushes to <code>main</code></h4>
+            <p>A <code>git push origin main</code> triggers the GitHub Actions workflow automatically.</p>
+          </div>
+        </li>
+        <li class="step">
+          <div class="step-number">2</div>
+          <div class="step-content">
+            <h4>GitHub Actions runner starts</h4>
+            <p>GitHub spins up a fresh Ubuntu runner and checks out the repository code.</p>
+          </div>
+        </li>
+        <li class="step">
+          <div class="step-number">3</div>
+          <div class="step-content">
+            <h4>SSH into EC2</h4>
+            <p>The runner uses a stored SSH private key secret to connect securely to the EC2 instance.</p>
+          </div>
+        </li>
+        <li class="step">
+          <div class="step-number">4</div>
+          <div class="step-content">
+            <h4>Pull latest code</h4>
+            <p>On the EC2 server, git pulls the latest changes from the repository.</p>
+          </div>
+        </li>
+        <li class="step">
+          <div class="step-number">5</div>
+          <div class="step-content">
+            <h4>Nginx serves the app</h4>
+            <p>Nginx is already configured to serve the files. The new version goes live instantly.</p>
+          </div>
+        </li>
+      </ol>
+    </section>
+  </main>
+
+  <footer>
+    <p>Built for CI/CD Webinar Demo &bull; Deployed via GitHub Actions &bull; Hosted on Amazon EC2</p>
+  </footer>
+</body>
+</html>
