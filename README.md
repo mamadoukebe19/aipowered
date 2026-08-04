@@ -10,7 +10,7 @@
 .
 ├── index.html                    # The web app (HTML)
 ├── style.css                     # Styling (CSS)
-├── nginx.conf                    # Nginx server configuration
+├── apache.conf                   # Apache virtual host config (reference)
 ├── scripts/
 │   └── ec2-setup.sh              # One-time EC2 server setup script
 ├── .github/
@@ -27,7 +27,7 @@
 Developer Machine          GitHub                    Amazon EC2 (Ubuntu)
 ──────────────────         ──────────────────        ──────────────────────
   git push origin main ──► triggers workflow ──────► SSH in, git pull
-                           (GitHub Actions)           Nginx serves the app
+                           (GitHub Actions)           Apache serves the app
                                                               │
                                                               ▼
                                                      http://YOUR_EC2_IP
@@ -37,8 +37,8 @@ Developer Machine          GitHub                    Amazon EC2 (Ubuntu)
 1. You push code to the `main` branch
 2. GitHub Actions automatically detects the push
 3. A runner SSHs into your EC2 instance using a stored private key
-4. It runs `git pull` to fetch the latest files
-5. Nginx serves the updated site immediately
+4. It runs `git pull` inside `/var/www/html` (Apache's web root)
+5. Apache serves the updated site immediately
 
 ---
 
@@ -78,20 +78,21 @@ ssh -i your-key.pem ubuntu@YOUR_EC2_PUBLIC_IP
 
 ### 1.3 Run the Setup Script
 
-Once connected, run the one-time setup script.  
-First, edit `scripts/ec2-setup.sh` and replace `YOUR_USERNAME/YOUR_REPO` with your actual GitHub repo URL, then:
+Upload or paste the contents of `scripts/ec2-setup.sh` on the EC2 instance, then run it:
 
 ```bash
-# On your EC2 instance
-bash <(curl -s https://raw.githubusercontent.com/YOUR_USERNAME/YOUR_REPO/main/scripts/ec2-setup.sh)
+bash ec2-setup.sh
 ```
 
-Or copy-paste the script content directly. The script will:
+The script will:
 - Update system packages
-- Install Git and Nginx
-- Clone your repository to `/var/www/demo-app`
-- Configure Nginx to serve your app
-- Enable Nginx on boot
+- Remove Nginx if present
+- Install Git and **Apache2**
+- Clone your repository directly into `/var/www/html` (Apache's default web root)
+- Enable `mod_rewrite` and start Apache
+- Enable Apache on boot
+
+After it finishes, open `http://YOUR_EC2_IP` — you should see your app, not the Apache default page.
 
 ---
 
@@ -108,7 +109,7 @@ Add these three secrets:
 
 | Secret Name | Value |
 |---|---|
-| `EC2_SSH_PRIVATE_KEY` | Contents of your `.pem` file (the entire file, including `-----BEGIN...-----`) |
+| `EC2_SSH_PRIVATE_KEY` | Full contents of your `.pem` file (including `-----BEGIN...-----` lines) |
 | `EC2_HOST` | Your EC2 public IP address (e.g. `54.123.45.67`) |
 | `EC2_USER` | `ubuntu` (default user for Ubuntu AMIs) |
 
@@ -119,7 +120,7 @@ Add these three secrets:
 cat your-key.pem
 ```
 
-Copy the entire output — from `-----BEGIN RSA PRIVATE KEY-----` to `-----END RSA PRIVATE KEY-----` — and paste it as the value for `EC2_SSH_PRIVATE_KEY`.
+Copy the entire output and paste it as the value for `EC2_SSH_PRIVATE_KEY`.
 
 ---
 
@@ -151,9 +152,9 @@ jobs:
           echo "$PRIVATE_KEY" > private_key.pem
           chmod 600 private_key.pem
           ssh -o StrictHostKeyChecking=no -i private_key.pem ${USER}@${HOST} << 'EOF'
-            cd /var/www/demo-app
+            cd /var/www/html
             git pull origin main
-            sudo systemctl reload nginx
+            sudo systemctl restart apache2
             echo "✅ Deployment successful!"
           EOF
 
@@ -164,39 +165,22 @@ jobs:
 
 **Key points:**
 - `on: push: branches: [main]` — only triggers on `main` pushes
-- `actions/checkout@v4` — checks out repo code on the runner
-- Secrets are injected as environment variables — never visible in logs
-- `StrictHostKeyChecking=no` — avoids interactive host verification on first connect
-- `if: always()` on cleanup — the `.pem` file is deleted even if the deploy fails
+- Apache serves from `/var/www/html` — that's where we `git pull`
+- `sudo systemctl restart apache2` — ensures Apache picks up changes
+- `if: always()` on cleanup — the `.pem` is deleted even if deploy fails
 
 ---
 
-## 🌐 Part 4 — Nginx Configuration
+## 🌐 Part 4 — Apache Configuration
 
-The `nginx.conf` file tells Nginx where to find your files and how to serve them.
+Apache2 on Ubuntu already serves `/var/www/html` by default — no custom config needed for a static HTML/CSS app. The `apache.conf` file in this repo is provided as a reference for future customization.
 
-```nginx
-server {
-    listen 80;
-    server_name YOUR_EC2_PUBLIC_IP;
+The key difference from Nginx: **Apache's default site already points to `/var/www/html`**, so cloning your repo there is all that's needed.
 
-    root /var/www/demo-app;
-    index index.html;
-
-    location / {
-        try_files $uri $uri/ =404;
-    }
-}
-```
-
-To apply it on EC2:
+To verify Apache is running on your EC2:
 
 ```bash
-sudo cp nginx.conf /etc/nginx/sites-available/demo-app
-sudo ln -s /etc/nginx/sites-available/demo-app /etc/nginx/sites-enabled/demo-app
-sudo rm /etc/nginx/sites-enabled/default
-sudo nginx -t       # test the config
-sudo systemctl reload nginx
+sudo systemctl status apache2
 ```
 
 ---
@@ -206,7 +190,6 @@ sudo systemctl reload nginx
 With everything configured, a single git push deploys your app:
 
 ```bash
-# On your local machine
 git add .
 git commit -m "initial deploy"
 git push origin main
@@ -218,7 +201,7 @@ Then watch the magic:
 2. Click the **Actions** tab
 3. You'll see the **"Deploy to EC2"** workflow running
 4. Green checkmark = deployed ✅
-5. Open `http://YOUR_EC2_IP` in your browser
+5. Open `http://YOUR_EC2_IP` in your browser — your app is live
 
 ---
 
@@ -227,8 +210,7 @@ Then watch the magic:
 This is the best part to show in a webinar. Edit a line, push, and the live site updates automatically:
 
 ```bash
-# Edit the page title or any text in index.html
-# Then:
+# Edit any text in index.html, then:
 git add index.html
 git commit -m "update hero text"
 git push origin main
@@ -240,11 +222,15 @@ Switch to the **Actions** tab on GitHub and watch the pipeline run. Refresh the 
 
 ## 🔒 Security Notes
 
-- **Never commit your `.pem` file** — add it to `.gitignore`
+- **Never commit your `.pem` file** — it is already in `.gitignore`
 - GitHub Secrets are encrypted and never shown in logs
-- In production, restrict SSH access (port 22) to specific IPs
-- Consider using **IAM roles** instead of key-based auth for advanced setups
-- Add `HTTPS` with Let's Encrypt (`certbot`) for production sites
+- In production, restrict SSH access (port 22) to specific IPs only
+- Add `HTTPS` with Let's Encrypt (`certbot`) for production sites:
+
+```bash
+sudo apt install -y certbot python3-certbot-apache
+sudo certbot --apache -d yourdomain.com
+```
 
 ---
 
@@ -252,11 +238,12 @@ Switch to the **Actions** tab on GitHub and watch the pipeline run. Refresh the 
 
 | Problem | Fix |
 |---|---|
-| `Permission denied (publickey)` | Check that `EC2_SSH_PRIVATE_KEY` secret has the exact content of the `.pem` file |
-| Workflow runs but site doesn't update | SSH into EC2 and run `git pull` manually to check for errors |
-| `nginx: configuration file test failed` | Run `sudo nginx -t` on EC2 to see the exact error |
-| Site shows "Welcome to nginx" | The default site is still enabled — run `sudo rm /etc/nginx/sites-enabled/default` |
-| EC2 not reachable on port 80 | Check the EC2 Security Group inbound rules allow HTTP (port 80) |
+| Still see Apache default page after setup | The setup script removes `/var/www/html` and clones fresh — re-run it |
+| `Permission denied (publickey)` | Check `EC2_SSH_PRIVATE_KEY` has the exact `.pem` content |
+| Site doesn't update after push | SSH in and run `cd /var/www/html && git pull` manually to see errors |
+| Apache not running | Run `sudo systemctl start apache2` on EC2 |
+| Can't reach port 80 | Check EC2 Security Group inbound rules — HTTP (port 80) must allow `0.0.0.0/0` |
+| `git pull` fails on EC2 | The repo may be owned by root — run `sudo chown -R ubuntu:ubuntu /var/www/html` |
 
 ---
 
@@ -264,8 +251,9 @@ Switch to the **Actions** tab on GitHub and watch the pipeline run. Refresh the 
 
 - [GitHub Actions documentation](https://docs.github.com/en/actions)
 - [Amazon EC2 User Guide](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/)
-- [Nginx Beginner's Guide](https://nginx.org/en/docs/beginners_guide.html)
+- [Apache2 on Ubuntu](https://ubuntu.com/tutorials/install-and-configure-apache)
 - [GitHub Encrypted Secrets](https://docs.github.com/en/actions/security-guides/encrypted-secrets)
+- [Let's Encrypt with Apache](https://certbot.eff.org/instructions?serveros=ubuntufocal&webserver=apache)
 
 ---
 

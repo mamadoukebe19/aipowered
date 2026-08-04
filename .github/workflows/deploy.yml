@@ -23,24 +23,25 @@ jobs:
           HOST: ${{ secrets.EC2_HOST }}
           USER: ${{ secrets.EC2_USER }}
         run: |
-          # Save the private key to a file
+          # Save the private key to a temp file
           echo "$PRIVATE_KEY" > private_key.pem
           chmod 600 private_key.pem
 
           # SSH into EC2 and deploy
           ssh -o StrictHostKeyChecking=no -i private_key.pem ${USER}@${HOST} << 'EOF'
-            cd /var/www/demo-app
-            
+            # Apache serves files from /var/www/html
+            cd /var/www/html
+
             # Pull latest changes from GitHub
             git pull origin main
-            
-            # Restart Nginx (optional, if needed)
-            sudo systemctl reload nginx
-            
+
+            # Restart Apache to pick up any changes
+            sudo systemctl restart apache2
+
             echo "✅ Deployment successful!"
           EOF
 
-      # Step 3: Cleanup
+      # Step 3: Always clean up the key file
       - name: Cleanup
         if: always()
         run: rm -f private_key.pem
