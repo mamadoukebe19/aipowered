@@ -11,7 +11,7 @@ REPO_URL="https://github.com/mamadoukebe19/aipowered.git"
 APP_DIR="/var/www/html"   # Apache default web root
 
 echo "=== [1/6] Updating system packages ==="
-sudo apt update && sudo apt upgrade -y
+sudo apt update -y
 
 echo "=== [2/6] Installing Git ==="
 sudo apt install -y git
