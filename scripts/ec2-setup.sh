@@ -1,39 +1,41 @@
 #!/bin/bash
-##############################################################
-#  EC2 First-Time Setup Script  (Apache version)
-#  Run this ONCE on your fresh Ubuntu EC2 instance.
-#  Usage:  bash ec2-setup.sh
-##############################################################
 
-set -e  # Exit on any error
+set -e
 
 REPO_URL="https://github.com/mamadoukebe19/aipowered.git"
-APP_DIR="/var/www/html"   # Apache default web root
+APP_DIR="/var/www/html"
 
-echo "=== [1/6] Updating system packages ==="
+echo "=== Installing Apache and Git ==="
+
 sudo apt update -y
+sudo apt install -y apache2 git
 
-echo "=== [2/6] Installing Git ==="
-sudo apt install -y git
+echo "=== Removing default Apache page ==="
 
-echo "=== [3/6] Removing Nginx (if present) and installing Apache ==="
-sudo systemctl stop nginx 2>/dev/null || true
-sudo apt remove -y nginx nginx-common 2>/dev/null || true
-sudo apt install -y apache2
+sudo rm -rf "$APP_DIR"/*
 
-echo "=== [4/6] Cloning the repository into Apache web root ==="
-# Remove the default Apache index page first
-sudo rm -rf "$APP_DIR"
+echo "=== Cloning application ==="
+
 sudo git clone "$REPO_URL" "$APP_DIR"
-# Give the ubuntu user ownership so git pull works without sudo later
-sudo chown -R ubuntu:ubuntu "$APP_DIR"
 
-echo "=== [5/6] Enabling mod_rewrite and restarting Apache ==="
-sudo a2enmod rewrite
+echo "=== Setting permissions ==="
+
+sudo chown -R www-data:www-data "$APP_DIR"
+sudo chmod -R 755 "$APP_DIR"
+
+echo "=== Starting Apache ==="
+
+sudo systemctl enable apache2
 sudo systemctl restart apache2
 
-echo "=== [6/6] Enabling Apache to start on boot ==="
-sudo systemctl enable apache2
+echo "=== Testing Apache ==="
+
+curl -I http://localhost
 
 echo ""
-echo "✅ Setup complete! Your app is live at http://$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4)"
+echo "======================================"
+echo "Installation completed"
+echo "======================================"
+
+echo "Application files:"
+ls -lah "$APP_DIR"
