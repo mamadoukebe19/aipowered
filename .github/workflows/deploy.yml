@@ -1,4 +1,4 @@
-name: Deploy HTML/CSS to EC2
+name: Deploy HTML CSS to EC2
 
 on:
   push:
@@ -7,7 +7,7 @@ on:
 
 jobs:
   deploy:
-    name: Deploy static website
+    name: Deploy static website to EC2
     runs-on: ubuntu-latest
 
     steps:
@@ -48,36 +48,82 @@ jobs:
             echo "Starting deployment"
             echo "======================================"
 
-            REPO_DIR="/var/www/html"
+            REPO_URL="https://github.com/mamadoukebe19/aipowered.git"
+            WEB_DIR="/var/www/html"
 
-            cd "$REPO_DIR"
+            echo "Installing required packages..."
 
-            echo "Updating repository..."
+            sudo apt update -y
+            sudo apt install -y apache2 git
 
-            sudo git fetch origin
-            sudo git reset --hard origin/main
+            echo "Creating Apache web directory..."
 
-            echo "Latest commit:"
+            sudo mkdir -p "$WEB_DIR"
+
+            echo "Checking repository..."
+
+            if [ ! -d "$WEB_DIR/.git" ]; then
+
+                echo "Repository does not exist."
+                echo "Cloning repository..."
+
+                sudo rm -rf "$WEB_DIR"
+
+                sudo git clone "$REPO_URL" "$WEB_DIR"
+
+            else
+
+                echo "Repository already exists."
+                echo "Updating repository..."
+
+                cd "$WEB_DIR"
+
+                sudo git fetch origin
+                sudo git reset --hard origin/main
+
+            fi
+
+            echo ""
+            echo "======================================"
+            echo "Repository status"
+            echo "======================================"
+
+            cd "$WEB_DIR"
+
             sudo git log -1 --oneline
 
-            echo "Setting permissions..."
+            echo ""
+            echo "Website files:"
+            ls -lah "$WEB_DIR"
 
-            sudo chown -R www-data:www-data "$REPO_DIR"
-            sudo chmod -R 755 "$REPO_DIR"
+            echo ""
+            echo "======================================"
+            echo "Configuring permissions"
+            echo "======================================"
 
-            echo "Testing Apache configuration..."
+            sudo chown -R www-data:www-data "$WEB_DIR"
+            sudo chmod -R 755 "$WEB_DIR"
+
+            echo ""
+            echo "======================================"
+            echo "Configuring Apache"
+            echo "======================================"
+
+            sudo systemctl enable apache2
 
             sudo apachectl configtest
 
-            echo "Restarting Apache..."
-
             sudo systemctl restart apache2
 
-            echo "Checking Apache..."
+            echo ""
+            echo "Apache status:"
 
-            sudo systemctl is-active --quiet apache2
+            sudo systemctl is-active apache2
 
-            echo "Testing website..."
+            echo ""
+            echo "======================================"
+            echo "Testing website"
+            echo "======================================"
 
             HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost)
 
@@ -92,9 +138,6 @@ jobs:
             echo "======================================"
             echo "DEPLOYMENT SUCCESSFUL"
             echo "======================================"
-
-            echo "Website files:"
-            ls -lah "$REPO_DIR"
 
           EOF
 
